@@ -1,0 +1,3 @@
+litestar
+uvicorn[standard]
+msgspec
