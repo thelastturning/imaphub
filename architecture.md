@@ -1,8 +1,8 @@
-# Technisches Architekturdokument: IMAP CampaignWizard Plattform
+# Technisches Architekturdokument: IMAP Hub Plattform
 
 ## 1. Executive Summary und Architektonische Vision
 
-Das vorliegende Dokument definiert die technische Spezifikation für den IMAP CampaignWizard, eine interne Enterprise-Webplattform zur Orchestrierung, Validierung und Verwaltung komplexer Marketing-Assets.
+Das vorliegende Dokument definiert die technische Spezifikation für den **IMAP Hub**, eine interne Enterprise-Plattform, und deren Kernmodul **CampaignWizard** zur Orchestrierung, Validierung und Verwaltung komplexer Marketing-Assets.
 
 Die Kernphilosophie der Architektur lautet **"Deterministische Flexibilität"**. Da Marketingdaten hierarchisch/vernetzt sind und KI-Modelle probabilistisch arbeiten, muss die technische Basis absolute Strenge bei Datentypen und Zustandsübergängen gewährleisten.
 

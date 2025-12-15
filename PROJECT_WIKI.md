@@ -5,8 +5,9 @@
 ---
 
 ## 1. Project Overview
-**Name:** IMAP CampaignWizard  
-**Goal:** Internal enterprise web platform for orchestrating, validating, and managing marketing assets (Google Ads).  
+**Name:** IMAP Hub
+**Modules:** CampaignWizard, Team Overview
+**Goal:** Internal enterprise web platform serving as a central hub for marketing operations, primarily orchestrating assets via the CampaignWizard.  
 **Core Philosophy:** "Deterministic Flexibility" - Strict types/state for data, flexible graph storage for hierarchy.
 
 ## 2. Technology Stack (Fixed)
@@ -41,8 +42,11 @@ frontend/
 │   ├── lib/
 │   │   ├── components/
 │   │   └── assets/
-│   ├── routes/                  # (Planned for refactor: Hub vs Wizard)
-│   ├── App.svelte               # Current Main Entry
+│   ├── views/                   # Feature Modules (Hub, Wizard, Team)
+│   │   ├── hub/                 # The Hub Dashboard
+│   │   ├── wizard/              # Campaign Architect
+│   │   └── team/                # Team Management
+│   ├── App.svelte               # Main Entry & Router
 │   └── main.ts
 ├── package.json
 └── vite.config.ts
@@ -57,12 +61,11 @@ frontend/
 ## 4. Concepts & Glossary
 
 ### The Hub (`/`)
-*Status: Planned*
-The central dashboard/landing page. Displays a grid of available "Apps" or modules (e.g., Campaign Architect, Team Overview).
+The central dashboard/landing page (Route: `/`). Displays a grid of available "Apps" or modules (e.g., Campaign Architect, Team Overview).
 
 ### Campaign Architect (`/wizard`)
-*Status: In Prototype*
-The tool for designing campaigns. Features a 3-column layout:
+*Also known as: CampaignWizard*
+The tool for designing campaigns (Route: `/wizard`). Features a 3-column layout:
 1.  **Strategy Briefing:** Read-only context.
 2.  **Asset Workspace:** Interactive canvas/grid for assets.
 3.  **Targeting:** Keywords and demographics.
