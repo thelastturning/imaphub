@@ -1,3 +1,5 @@
 litestar
 uvicorn[standard]
 msgspec
+sniffio
+python-arango

@@ -7,7 +7,14 @@
         "resolveJsonModule": true,
         "allowJs": true,
         "checkJs": true,
-        "isolatedModules": true
+        "isolatedModules": true,
+        "moduleResolution": "bundler",
+        "baseUrl": ".",
+        "paths": {
+            "$lib/*": [
+                "src/lib/*"
+            ]
+        }
     },
     "include": [
         "src/**/*.d.ts",
