@@ -73,6 +73,7 @@ src/
 - **Sync Logic:** AQL "Upsert-Merge" pattern preserves local changes during Google Ads sync
 - **Policy Handling:** Recursive "Try-Catch-Exempt" loop for Google Ads policy violations
 - **Background Workers:** Arq integration with Redis for async job processing
+- **AI Integration:** Google Gemini 2.5 Flash via `google-genai` SDK with "Schema Bridge" for Msgspec compatibility
 
 ### 3.2 Frontend (`frontend/`)
 Standard Vite + Svelte setup.
@@ -122,5 +123,16 @@ The tool for designing campaigns (Route: `/wizard`). Features a 3-column layout:
 2.  **Verify Architecture:** Check `ARCHITECTURE.md` compliance.
 3.  **No Guessing:** If directory structure is unclear, check this Wiki or `ARCHITECTURE.md`.
 
+## 6. Current Implementation Status (LLM Integration)
+**Implemented:**
+- [x] **SDK & Auth:** `google-genai` Integrated with API Key auth.
+- [x] **Schema Bridge:** Transformation of `msgspec` Structs to Gemini-compatible JSON Schema (fixed `additionalProperties` issue).
+- [x] **Generation Pipeline:** `GeminiService` generating structured RSA Assets (Headlines/Descriptions) using **Gemini 2.5 Flash**.
+- [x] **Frontend UI:** "Generate with AI" button and input fields.
+
+**Missing / Known Issues:**
+- [ ] **Persistence Layer (Spec Point 5):** The graph modeling and AQL Batch-Insert strategy to save generated assets to ArangoDB is **NOT yet implemented**. Generated assets currently live only in memory/frontend.
+
 ---
-*Last Updated: 2025-12-16 (Backend Fully Implemented - OAuth2, Graph DB, Sync Engine, Mutations, Workers)*
+*Last Updated: 2025-12-16 (LLM Integration: Generation Working, Persistence Layer Missing)*
+

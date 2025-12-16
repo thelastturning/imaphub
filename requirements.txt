@@ -1,9 +1,11 @@
-litestar
-uvicorn[standard]
+litestar[standard]
+uvicorn
 msgspec
-sniffio
 python-arango
+httpx
 arq
 redis
 cryptography
 google-ads
+google-genai>=0.2.0
+tenacity>=8.2.0

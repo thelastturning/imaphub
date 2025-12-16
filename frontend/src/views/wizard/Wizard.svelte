@@ -1,12 +1,155 @@
 <script lang="ts">
     import Header from "$lib/components/Header.svelte";
+    import AssetTile from "$lib/components/AssetTile.svelte";
 
-    // Dashboard Logic
-    let assets = [
-        { id: 1, name: "Generic Asset", type: "generic", color: "gray" },
-        { id: 2, name: "Approved Image", type: "image", color: "emerald" },
-        { id: 3, name: "Rejected Copy", type: "text", color: "rose" },
+    type AssetState = "neutral" | "selected" | "rejected";
+
+    interface Asset {
+        id: number;
+        text: string;
+        state: AssetState;
+    }
+
+    // Dummy Data
+    let headlines: Asset[] = [
+        {
+            id: 1,
+            text: "Revolutionize Your Marketing Strategy",
+            state: "neutral",
+        },
+        {
+            id: 2,
+            text: "Boost ROI with AI-Powered Campaigns",
+            state: "neutral",
+        },
+        { id: 3, text: "Transform Your Business Today", state: "neutral" },
+        {
+            id: 4,
+            text: "Unlock Growth with Smart Automation",
+            state: "neutral",
+        },
+        {
+            id: 5,
+            text: "Experience the Future of Advertising",
+            state: "neutral",
+        },
+        {
+            id: 6,
+            text: "Drive Results with Data-Driven Insights",
+            state: "neutral",
+        },
     ];
+
+    let descriptions: Asset[] = [
+        {
+            id: 7,
+            text: "Discover cutting-edge tools designed to elevate your campaigns and maximize your advertising budget.",
+            state: "neutral",
+        },
+        {
+            id: 8,
+            text: "Join thousands of businesses achieving unprecedented growth with our proven platform.",
+            state: "neutral",
+        },
+        {
+            id: 9,
+            text: "Streamline your workflow and focus on what matters most - growing your business.",
+            state: "neutral",
+        },
+        {
+            id: 10,
+            text: "Get started in minutes with our intuitive interface and expert support team.",
+            state: "neutral",
+        },
+    ];
+
+    function updateHeadlineState(id: number, newState: AssetState) {
+        headlines = headlines.map((h) =>
+            h.id === id ? { ...h, state: newState } : h,
+        );
+    }
+
+    function updateDescriptionState(id: number, newState: AssetState) {
+        descriptions = descriptions.map((d) =>
+            d.id === id ? { ...d, state: newState } : d,
+        );
+    }
+
+    function editAsset(id: number, type: "headline" | "description") {
+        // Placeholder for edit functionality
+        alert(`Edit ${type} #${id}`);
+    }
+
+    // AI Generation State
+    let isGenerating = false;
+    let generationError: string | null = null;
+    let landingPageUrl = "";
+    let targetKeywords = "Marketing, Automation, SaaS";
+
+    async function generateWithAI() {
+        isGenerating = true;
+        generationError = null;
+
+        try {
+            const response = await fetch(
+                "http://localhost:8000/campaigns/generate-assets",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        landing_page_url:
+                            landingPageUrl || "https://example.com",
+                        target_keywords: targetKeywords
+                            .split(",")
+                            .map((k) => k.trim()),
+                        brand_voice: "professional",
+                        language: "de",
+                    }),
+                },
+            );
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.message || data.error);
+            }
+
+            // Populate headlines
+            headlines = data.headlines.map((text: string, index: number) => ({
+                id: index + 1,
+                text,
+                state: "neutral" as AssetState,
+            }));
+
+            // Populate descriptions
+            descriptions = data.descriptions.map(
+                (text: string, index: number) => ({
+                    id: headlines.length + index + 1,
+                    text,
+                    state: "neutral" as AssetState,
+                }),
+            );
+        } catch (error) {
+            generationError =
+                error instanceof Error ? error.message : "Unknown error";
+            console.error("Generation failed:", error);
+        } finally {
+            isGenerating = false;
+        }
+    }
+
+    $: selectedHeadlines = headlines.filter(
+        (h) => h.state === "selected",
+    ).length;
+    $: selectedDescriptions = descriptions.filter(
+        (d) => d.state === "selected",
+    ).length;
 </script>
 
 <div
@@ -25,7 +168,7 @@
                 Strategy Briefing
             </h2>
             <div
-                class="flex-1 bg-white/5 p-4 rounded-sm text-gray-300 text-sm overflow-y-auto"
+                class="flex-1 bg-white/5 p-4 text-gray-300 text-sm overflow-y-auto"
             >
                 <p class="mb-4">
                     <strong>Campaign Goal:</strong><br />
@@ -51,65 +194,165 @@
                 class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/5 via-transparent to-transparent pointer-events-none"
             ></div>
 
-            <header class="mb-8 flex justify-between items-end z-10 shrink-0">
-                <div>
-                    <h1 class="text-2xl text-white font-bold mb-1">
-                        Asset Workspace
-                    </h1>
-                    <p class="text-gray-400 text-sm">
-                        Drag and drop assets to organize your campaign.
-                    </p>
+            <header class="mb-6 z-10 shrink-0">
+                <h1 class="text-2xl text-white font-bold mb-1">
+                    Asset Selection
+                </h1>
+                <p class="text-gray-400 text-sm mb-4">
+                    Click tiles to cycle through states: Neutral → Selected →
+                    Rejected
+                </p>
+
+                <!-- AI Generation Controls -->
+                <div class="bg-black/40 border border-white/10 p-4 space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-gray-400 text-xs mb-1 block"
+                                >Landing Page URL</label
+                            >
+                            <input
+                                type="text"
+                                bind:value={landingPageUrl}
+                                placeholder="https://example.com"
+                                class="w-full bg-white/5 border border-white/10 px-3 py-2 text-white text-sm focus:border-imap-primary outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-gray-400 text-xs mb-1 block"
+                                >Target Keywords (comma-separated)</label
+                            >
+                            <input
+                                type="text"
+                                bind:value={targetKeywords}
+                                placeholder="Marketing, Automation, SaaS"
+                                class="w-full bg-white/5 border border-white/10 px-3 py-2 text-white text-sm focus:border-imap-primary outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <button
+                            on:click={generateWithAI}
+                            disabled={isGenerating}
+                            class="px-6 py-2 bg-imap-primary hover:bg-imap-primary-hover text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {#if isGenerating}
+                                <svg
+                                    class="animate-spin h-4 w-4"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <circle
+                                        class="opacity-25"
+                                        cx="12"
+                                        cy="12"
+                                        r="10"
+                                        stroke="currentColor"
+                                        stroke-width="4"
+                                    ></circle>
+                                    <path
+                                        class="opacity-75"
+                                        fill="currentColor"
+                                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                    ></path>
+                                </svg>
+                                Generating...
+                            {:else}
+                                ✨ Generate with AI
+                            {/if}
+                        </button>
+
+                        {#if generationError}
+                            <span class="text-red-400 text-sm"
+                                >{generationError}</span
+                            >
+                        {/if}
+                    </div>
                 </div>
-                <button
-                    class="px-4 py-2 bg-imap-primary hover:bg-imap-primary-hover text-white text-sm font-semibold transition-colors"
-                >
-                    + New Asset
-                </button>
             </header>
 
-            <!-- Canvas / Grid Area -->
-            <div
-                class="flex-1 grid grid-cols-3 gap-6 auto-rows-min z-10 overflow-y-auto pb-8"
-            >
-                <!-- Tile 1 -->
-                <div
-                    class="aspect-square bg-gray-700/50 border border-white/10 hover:border-imap-primary/50 transition-colors p-4 flex flex-col justify-between group cursor-pointer"
-                >
-                    <div
-                        class="h-8 w-8 bg-gray-600 rounded-full flex items-center justify-center text-xs text-white"
+            <!-- 2-Column Grid: Headlines | Descriptions -->
+            <div class="flex-1 grid grid-cols-2 gap-8 z-10 overflow-hidden">
+                <!-- Headlines Column -->
+                <div class="flex flex-col">
+                    <h3
+                        class="text-white font-semibold mb-4 flex items-center gap-2"
                     >
-                        #1
+                        <span class="w-1 h-5 bg-imap-primary block"></span>
+                        Headlines
+                    </h3>
+                    <div class="flex-1 overflow-y-auto space-y-3 pr-2">
+                        {#each headlines as headline}
+                            <AssetTile
+                                text={headline.text}
+                                state={headline.state}
+                                onStateChange={(newState) =>
+                                    updateHeadlineState(headline.id, newState)}
+                                onEdit={() =>
+                                    editAsset(headline.id, "headline")}
+                            />
+                        {/each}
                     </div>
-                    <span
-                        class="text-gray-300 font-medium group-hover:text-white"
-                        >Generic Asset</span
-                    >
                 </div>
 
-                <!-- Tile 2 -->
-                <div
-                    class="aspect-square bg-emerald-900/20 border border-emerald-500/30 hover:border-emerald-500/60 transition-colors p-4 flex flex-col justify-between group cursor-pointer"
-                >
-                    <div
-                        class="h-8 w-8 bg-emerald-700 rounded-full flex items-center justify-center text-xs text-white"
+                <!-- Descriptions Column -->
+                <div class="flex flex-col">
+                    <h3
+                        class="text-white font-semibold mb-4 flex items-center gap-2"
                     >
-                        #2
+                        <span class="w-1 h-5 bg-imap-primary block"></span>
+                        Descriptions
+                    </h3>
+                    <div class="flex-1 overflow-y-auto space-y-3 pr-2">
+                        {#each descriptions as description}
+                            <AssetTile
+                                text={description.text}
+                                state={description.state}
+                                onStateChange={(newState) =>
+                                    updateDescriptionState(
+                                        description.id,
+                                        newState,
+                                    )}
+                                onEdit={() =>
+                                    editAsset(description.id, "description")}
+                            />
+                        {/each}
                     </div>
-                    <span class="text-emerald-100 font-medium"
-                        >Approved Image</span
-                    >
                 </div>
+            </div>
 
-                <!-- Tile 3 -->
+            <!-- Counter Bar -->
+            <div class="mt-6 z-10 shrink-0">
                 <div
-                    class="aspect-square bg-rose-900/20 border border-rose-500/30 hover:border-rose-500/60 transition-colors p-4 flex flex-col justify-between group cursor-pointer"
+                    class="bg-black/40 border border-white/10 p-4 flex justify-between items-center"
                 >
-                    <div
-                        class="h-8 w-8 bg-rose-700 rounded-full flex items-center justify-center text-xs text-white"
-                    >
-                        #3
+                    <div class="flex gap-8">
+                        <div>
+                            <span class="text-gray-400 text-sm"
+                                >Headlines Selected:</span
+                            >
+                            <span
+                                class="ml-2 text-imap-primary font-bold text-lg"
+                                >{selectedHeadlines}</span
+                            >
+                        </div>
+                        <div>
+                            <span class="text-gray-400 text-sm"
+                                >Descriptions Selected:</span
+                            >
+                            <span
+                                class="ml-2 text-imap-primary font-bold text-lg"
+                                >{selectedDescriptions}</span
+                            >
+                        </div>
                     </div>
-                    <span class="text-rose-100 font-medium">Rejected Copy</span>
+                    <button
+                        class="px-6 py-2 bg-imap-primary hover:bg-imap-primary-hover text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={selectedHeadlines === 0 ||
+                            selectedDescriptions === 0}
+                    >
+                        Push to Google Ads
+                    </button>
                 </div>
             </div>
         </section>
@@ -122,7 +365,7 @@
             </h2>
             <div class="flex-1 space-y-4 overflow-y-auto">
                 <!-- Keywords Panel -->
-                <div class="bg-white/5 p-4 rounded-sm border border-white/5">
+                <div class="bg-white/5 p-4 border border-white/5">
                     <h3
                         class="text-gray-400 text-xs uppercase tracking-wider font-bold mb-3"
                     >
@@ -145,7 +388,7 @@
                 </div>
 
                 <!-- Audience Panel -->
-                <div class="bg-white/5 p-4 rounded-sm border border-white/5">
+                <div class="bg-white/5 p-4 border border-white/5">
                     <h3
                         class="text-gray-400 text-xs uppercase tracking-wider font-bold mb-3"
                     >
