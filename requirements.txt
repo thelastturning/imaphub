@@ -3,3 +3,7 @@ uvicorn[standard]
 msgspec
 sniffio
 python-arango
+arq
+redis
+cryptography
+google-ads

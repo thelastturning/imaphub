@@ -24,15 +24,55 @@ The stack is non-negotiable as per `ARCHITECTURE.md`.
 ## 3. Directory Structure
 
 ### 3.1 Backend (`src/`)
-*Currently in initial setup. Target structure:*
+**Status: Fully Implemented (Modular Monolith)**
+
+The backend follows a strict domain-driven design with separation between business logic (`domain/`) and infrastructure (`lib/`).
+
 ```text
 src/
 ├── app/
-│   ├── domain/                  # Feature Logic (Campaigns, Assets)
-│   ├── lib/                     # Infra (DB, Auth, AI)
-│   └── main.py                  # Entrypoint
-└── seed.py                      # Database seeding script
+│   ├── domain/                     # Business Logic (Feature Slices)
+│   │   ├── assets/                 # Asset Management
+│   │   │   ├── models.py           # Asset, AssetType structs
+│   │   │   ├── controllers.py      # REST endpoints
+│   │   │   └── services.py         # Business logic
+│   │   ├── auth/                   # OAuth2 Authentication
+│   │   │   ├── models.py           # UserCredentials, CredentialStatus
+│   │   │   └── controllers.py      # /auth/login, /auth/callback
+│   │   ├── campaigns/              # Campaign Management
+│   │   │   ├── models.py           # Campaign, AdResponse structs
+│   │   │   ├── controllers.py      # Campaign CRUD endpoints
+│   │   │   ├── services.py         # CampaignService (sync logic)
+│   │   │   └── mutations.py        # GoogleAdsMutator (policy handling)
+│   │   ├── reporting/              # Reporting & Analytics
+│   │   │   ├── models.py           # SearchTermRow
+│   │   │   ├── controllers.py      # Report endpoints
+│   │   │   └── services.py         # GAQLService (query builder)
+│   │   └── shared/                 # Shared Models
+│   │       └── models.py           # EntityStatus, AdType, ArangoDocument
+│   ├── lib/                        # Infrastructure Layer
+│   │   ├── ai/                     # AI Integration (Instructor + LiteLLM)
+│   │   │   └── client.py           # AIClient stub
+│   │   ├── auth/                   # Security & OAuth
+│   │   │   ├── security.py         # TokenEncryptor (AES-256-GCM)
+│   │   │   └── service.py          # AuthService (OAuth2 flow)
+│   │   ├── db/                     # Database Layer
+│   │   │   ├── client.py           # ArangoClient (connection management)
+│   │   │   └── init_db.py          # Graph schema initialization
+│   │   └── google_ads/             # Google Ads API Integration
+│   │       └── client.py           # GoogleAdsClientFactory
+│   └── main.py                     # Litestar Application Entrypoint
+├── worker.py                       # Arq Worker Configuration
+└── seed.py                         # Database seeding script
 ```
+
+**Key Implementation Details:**
+- **Msgspec Structs:** All models use `msgspec.Struct` for strict typing and high-performance serialization
+- **ArangoDB Graph:** `AdsGraph` with vertex collections (Customers, Campaigns, AdGroups, Ads, Assets, Keywords) and edge definitions
+- **OAuth2 Security:** AES-256-GCM envelope encryption for refresh tokens
+- **Sync Logic:** AQL "Upsert-Merge" pattern preserves local changes during Google Ads sync
+- **Policy Handling:** Recursive "Try-Catch-Exempt" loop for Google Ads policy violations
+- **Background Workers:** Arq integration with Redis for async job processing
 
 ### 3.2 Frontend (`frontend/`)
 Standard Vite + Svelte setup.
@@ -57,6 +97,8 @@ frontend/
   - `db`: ArangoDB (Port 8529)
   - `backend`: Litestar (Port 8000)
   - `frontend`: Vite Dev Server (Port 5173)
+  - `redis`: Redis (Port 6379) - Job queue for Arq
+  - `worker`: Arq Worker - Background job processing
 
 ## 4. Concepts & Glossary
 
@@ -81,4 +123,4 @@ The tool for designing campaigns (Route: `/wizard`). Features a 3-column layout:
 3.  **No Guessing:** If directory structure is unclear, check this Wiki or `ARCHITECTURE.md`.
 
 ---
-*Last Updated: 2025-12-15*
+*Last Updated: 2025-12-16 (Backend Fully Implemented - OAuth2, Graph DB, Sync Engine, Mutations, Workers)*
