@@ -38,7 +38,7 @@ def init_db():
         ("campaign_adgroup", ["Campaigns"], ["AdGroups"]),
         ("adgroup_ad", ["AdGroups"], ["Ads"]),
         ("adgroup_keyword", ["AdGroups"], ["Keywords"]),
-        ("ad_asset", ["Ads"], ["Assets"])
+        ("uses_asset", ["AdGroups", "Ads"], ["Assets"])
     ]
     
     for edge_name, from_cols, to_cols in edges:
@@ -51,11 +51,19 @@ def init_db():
             print(f"Created Edge Definition: {edge_name}")
 
     # 4. Create Indexes
+    # NOTE: Per Architecture Spec (Section 4.2):
+    # "The hash becomes the _key for the Asset vertex"
+    # We do NOT create a separate unique index on 'hash' because _key IS the hash.
+    # The _key field is automatically unique by ArangoDB.
+    
     # Stats Index (Persistent on entity_id, date)
     if db.has_collection("DailyStats"):
         stats = db.collection("DailyStats")
-        stats.add_persistent_index(fields=["entity_id", "date"], name="idx_stats_entity_date")
-        print("Created Index: idx_stats_entity_date")
+        # Only create if not exists (check via index list)
+        existing = [i["name"] for i in stats.indexes()]
+        if "idx_stats_entity_date" not in existing:
+            stats.add_persistent_index(fields=["entity_id", "date"], name="idx_stats_entity_date")
+            print("Created Index: idx_stats_entity_date")
 
     print("Database Initialization Complete.")
 

@@ -3,7 +3,9 @@
 
   // Import Pages
   import Hub from "./views/hub/Hub.svelte";
-  import Wizard from "./views/wizard/Wizard.svelte";
+  import CampaignWizard from "./views/wizard/CampaignWizard.svelte";
+  import NewCampaign from "./views/wizard/NewCampaign.svelte";
+  import CampaignOverview from "./views/wizard/CampaignOverview.svelte";
   import Team from "./views/team/Team.svelte";
 
   // State
@@ -14,7 +16,11 @@
 
     // Simple Router Logic
     if (hash === "/wizard") {
-      currentComponent = Wizard;
+      currentComponent = CampaignWizard;
+    } else if (hash === "/wizard/new") {
+      currentComponent = NewCampaign;
+    } else if (hash === "/wizard/overview") {
+      currentComponent = CampaignOverview;
     } else if (hash === "/team") {
       currentComponent = Team;
     } else {

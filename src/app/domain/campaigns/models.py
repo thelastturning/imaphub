@@ -30,6 +30,31 @@ class GenerateAssetsRequest(msgspec.Struct):
     brand_voice: str | None = None  # e.g., "professional", "playful"
     language: str = "de"  # ISO 639-1 code
 
+class ImportReportRequest(msgspec.Struct):
+    """
+    Request to generate campaign structure from a Deep Research Report.
+    """
+    report_text: str
+    customer_id: str = "123-456-7890" # Default for now
+
+# --- New Models for Deep Research Parsing ---
+
+class Keyword(msgspec.Struct):
+    text: str
+    match_type: str  # BROAD, PHRASE, EXACT
+
+class AIAdGroup(msgspec.Struct):
+    name: str # e.g. "HR Managers"
+    keywords: list[Keyword]
+    assets: RSAAsset
+
+class CampaignStructure(msgspec.Struct):
+    campaign_name: str
+    budget_recommendation: float
+    ad_groups: list[AIAdGroup]
+    language: str = "de"
+    target_locations: list[str] = msgspec.field(default_factory=lambda: ["Germany", "Austria", "Switzerland"])
+
 from typing import Optional, List
 from app.domain.shared.models import ArangoDocument, EntityStatus, AdType
 

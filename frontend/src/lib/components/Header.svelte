@@ -14,7 +14,7 @@
 
         if (hasUnsavedChanges) {
             // In the future: proper dialog. For now: browser confirm.
-            if (!confirm("You have unsaved changes. Discard them?")) {
+            if (!confirm("Sie haben ungespeicherte Änderungen. Verwerfen?")) {
                 return;
             }
         }

@@ -22,7 +22,8 @@
         </div>
         <h1 class="text-4xl font-bold mb-4">Team Overview</h1>
         <p class="text-gray-400 mb-8 max-w-md mx-auto">
-            Manage your team members, roles, and permissions in one place.
+            Verwalten Sie Ihre Teammitglieder, Rollen und Berechtigungen an
+            einem Ort.
         </p>
         <span
             class="px-3 py-1 bg-gray-800 text-gray-400 text-sm rounded-full border border-white/10"
@@ -34,7 +35,7 @@
                 href="#/"
                 class="text-imap-primary hover:text-white transition-colors text-sm font-semibold"
             >
-                &larr; Back to Hub
+                &larr; Zurück zum Hub
             </a>
         </div>
     </div>

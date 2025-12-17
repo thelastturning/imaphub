@@ -53,15 +53,37 @@ src/
 │   ├── lib/                        # Infrastructure Layer
 │   │   ├── ai/                     # AI Integration (Instructor + LiteLLM)
 │   │   │   └── client.py           # AIClient stub
-│   │   ├── auth/                   # Security & OAuth
-│   │   │   ├── security.py         # TokenEncryptor (AES-256-GCM)
-│   │   │   └── service.py          # AuthService (OAuth2 flow)
-│   │   ├── db/                     # Database Layer
-│   │   │   ├── client.py           # ArangoClient (connection management)
-│   │   │   └── init_db.py          # Graph schema initialization
-│   │   └── google_ads/             # Google Ads API Integration
-│   │       └── client.py           # GoogleAdsClientFactory
-│   └── main.py                     # Litestar Application Entrypoint
+├── domain/                     # Business Logic (Feature Slices)
+│   ├── assets/                 # Asset Management
+│   │   ├── models.py           # Asset, AssetType structs
+│   │   ├── controllers.py      # REST endpoints
+│   │   └── services.py         # Business logic
+│   ├── auth/                   # OAuth2 Authentication
+│   │   ├── models.py           # UserCredentials, CredentialStatus
+│   │   └── controllers.py      # /auth/login, /auth/callback
+│   ├── campaigns/              # Campaign Management
+│   │   ├── models.py           # Campaign, AdResponse structs
+│   │   ├── controllers.py      # Campaign CRUD endpoints
+│   │   ├── services.py         # CampaignService (sync logic)
+│   │   └── mutations.py        # GoogleAdsMutator (policy handling)
+│   ├── reporting/              # Reporting & Analytics
+│   │   ├── models.py           # SearchTermRow
+│   │   ├── controllers.py      # Report endpoints
+│   │   └── services.py         # GAQLService (query builder)
+│   └── shared/                 # Shared Models
+│       └── models.py           # EntityStatus, AdType, ArangoDocument
+├── lib/                        # Infrastructure Layer
+│   ├── ai/                     # AI Integration (Instructor + LiteLLM)
+│   │   └── client.py           # AIClient stub
+│   ├── auth/                   # Security & OAuth
+│   │   ├── security.py         # TokenEncryptor (AES-256-GCM)
+│   │   └── service.py          # AuthService (OAuth2 flow)
+│   ├── db/                     # Database Layer
+│   │   ├── client.py           # ArangoClient (connection management)
+│   │   └── init_db.py          # Graph schema initialization
+│   └── google_ads/             # Google Ads API Integration
+│       └── client.py           # GoogleAdsClientFactory
+├── main.py                     # Litestar Application Entrypoint
 ├── worker.py                       # Arq Worker Configuration
 └── seed.py                         # Database seeding script
 ```
@@ -85,7 +107,11 @@ frontend/
 │   │   └── assets/
 │   ├── views/                 # Feature Modules (Hub, Wizard, Team)
 │   │   ├── hub/               # The Hub Dashboard
-│   │   ├── wizard/            # Campaign Architect
+│   │   ├── wizard/            # Campaign Architect (Wizard Module)
+│   │   │   ├── CampaignWizard.svelte  # Entry Menu (Sub-Hub)
+│   │   │   ├── NewCampaign.svelte     # Main Creation Tool (Split-View)
+│   │   │   ├── CampaignOverview.svelte# Placeholder
+│   │   │   └── store.svelte.js        # Global Wizard State (Runes)
 │   │   └── team/              # Team Management
 │   ├── App.svelte             # Main Entry & Router
 │   └── main.ts
@@ -132,16 +158,45 @@ The tool for designing campaigns (Route: `/wizard`). Features a 3-column layout:
 2.  **Verify Architecture:** Check `ARCHITECTURE.md` compliance.
 3.  **No Guessing:** If directory structure is unclear, check this Wiki or `ARCHITECTURE.md`.
 
-## 6. Current Implementation Status (LLM Integration)
-**Implemented:**
-- [x] **SDK & Auth:** `google-genai` Integrated with API Key auth.
-- [x] **Schema Bridge:** Transformation of `msgspec` Structs to Gemini-compatible JSON Schema (fixed `additionalProperties` issue).
-- [x] **Generation Pipeline:** `GeminiService` generating structured RSA Assets (Headlines/Descriptions) using **Gemini 2.5 Flash**.
-- [x] **Frontend UI:** "Generate with AI" button and input fields.
+## 6. Current Implementation Status
+**Status:** **Core MVP Complete / Pre-Alpha** ✅
 
-**Missing / Known Issues:**
-- [ ] **Persistence Layer (Spec Point 5):** The graph modeling and AQL Batch-Insert strategy to save generated assets to ArangoDB is **NOT yet implemented**. Generated assets currently live only in memory/frontend.
+**Backend:**
+- [x] **Modular Monolith Architecture:** Fully implemented with Litestar.
+- [x] **ArangoDB Persistence:** `CampaignService` and `CampaignRepository` implemented.
+    -   **Graph Schema:** `AdsGraph` with vertex collections (Campaigns, AdGroups, Assets, etc.)
+    -   **Deduplication:** Assets use `_key` as SHA-256 hash (per Architecture Spec Section 4.2)
+- [x] **Google Ads Mutator:** `GoogleAdsMutator` logic implemented (with mock integration).
+- [x] **AI Integration:** `GeminiService` implemented for Deep Research Report analysis.
+    -   Uses **Gemini 2.5 Flash** (configurable via `GEMINI_MODEL` env var).
+    -   Parses unstructured research reports into `CampaignStructure` (AdGroups, Keywords, Assets).
+    -   Full E2E flow verified: Report → AI Analysis → DB Persistence → UI Display.
+
+**Frontend:**
+- [x] **Navigation:** "Hub & Spoke" model implemented.
+    -   `Hub.svelte`: Main Entry.
+    -   `CampaignWizard.svelte`: Sub-Hub for managing campaigns.
+- [x] **Creation Workflow (`NewCampaign.svelte`):**
+    -   **Import:** "Deep Research" Modal for report text upload.
+    -   **Split-View UI:** Left Sidebar (AdGroup Navigation) | Right Panel (Asset Editor).
+    -   **Manual Control:** Structured inputs for Language (DE/EN), Location (DACH), and Objective.
+    -   **Ad Group Management:** Dynamic list of Ad Groups generated from AI analysis.
+    -   **Asset Display:** Headlines and Descriptions with character count indicators.
+- [x] **Localization:** Frontend fully translated to German (DE), with specific exceptions for technical terms ("CampaignWizard", "Setup", "Coming Soon").
+- [x] **State Management:** `WizardState` (Runes-based) handles complex nested campaign data.
+
+**Infrastructure:**
+- [x] **Docker Compose:** All services containerized (db, backend, frontend, redis, worker).
+- [x] **Database Init:** `init_db.py` creates graph schema on startup.
+- [x] **Logging:** Debug logging available in `logs/` directory (currently disabled, can be re-enabled in `controllers.py`).
+
+**Missing / Next Steps:**
+- [ ] **Live Google Ads API:** Still awaiting valid credentials for live testing.
+- [ ] **User Authentication:** OAuth2 flow implementation pending.
+- [ ] **Deployment:** Staging environment setup.
+- [ ] **Asset Editing:** Real-time editing of generated headlines/descriptions.
+- [ ] **Keyword Management:** UI for managing keywords per AdGroup.
 
 ---
-*Last Updated: 2025-12-16 (LLM Integration: Generation Working, Persistence Layer Missing)*
+*Last Updated: 2025-12-18 (E2E Deep Research Import Flow Verified)*
 

@@ -1,64 +1,92 @@
 from litestar import Controller, get, post
 from litestar.di import Provide
 from app.lib.ai.client import GeminiService
-from app.domain.campaigns.models import GenerateAssetsRequest, RSAAsset
-import msgspec
+from app.domain.campaigns.services import CampaignService
+from app.domain.campaigns.models import GenerateAssetsRequest, CampaignStructure, ImportReportRequest
+from app.lib.db.client import get_arango_db
+from arango.database import StandardDatabase
 
+# Dependency providers
+async def provide_campaign_service(db: StandardDatabase) -> CampaignService:
+    return CampaignService(db)
 
-# Dependency provider for GeminiService
 async def provide_gemini_service() -> GeminiService:
     return GeminiService()
 
-
 class CampaignController(Controller):
-    path = "/campaigns"
-    dependencies = {"gemini_service": Provide(provide_gemini_service)}
+    path = "/api/v1/campaigns" # Matched frontend prefix
+    dependencies = {
+        "db": Provide(get_arango_db),
+        "campaign_service": Provide(provide_campaign_service),
+        "gemini_service": Provide(provide_gemini_service)
+    }
 
-    @get("/")
-    async def list_campaigns(self) -> dict:
-        return {"message": "Campaigns logic here"}
-    
-    @post("/generate-assets")
+    @post("/generate")
     async def generate_assets(
         self,
         data: GenerateAssetsRequest,
-        gemini_service: GeminiService
-    ) -> dict:
+        campaign_service: CampaignService
+    ) -> CampaignStructure:
         """
-        Generate RSA assets using Gemini 1.5 Flash.
-        
-        Request body:
-        {
-            "landing_page_url": "https://example.com",
-            "target_keywords": ["keyword1", "keyword2"],
-            "brand_voice": "professional",  // optional
-            "language": "de"  // optional, defaults to "de"
-        }
+        Generate Campaign Structure (AdGroups, Assets) using Gemini and persist to DB.
         """
         try:
-            assets = await gemini_service.generate_rsa_assets(
+            structure = await campaign_service.generate_campaign_structure_from_inputs(
                 landing_page_url=data.landing_page_url,
-                target_keywords=data.target_keywords,
-                brand_voice=data.brand_voice,
-                language=data.language
+                keywords=data.target_keywords
             )
-            return assets
+            return structure
         except Exception as e:
-            # Log full error for debugging
             import traceback
-            print(f"ERROR in generate_assets: {type(e).__name__}: {str(e)}")
             traceback.print_exc()
-            return {
-                "error": str(e),
-                "message": "Failed to generate assets"
-            }
+            # Return error structure or raise
+            raise e
+
+    @post("/import-report")
+    async def import_report(
+        self,
+        data: ImportReportRequest,
+        campaign_service: CampaignService
+    ) -> CampaignStructure:
+        """
+        Parse Deep Research Report and generate Campaign Structure.
+        """
+        # === DEBUG LOGGING (commented out - uncomment to enable) ===
+        # import logging
+        # import os
+        # from datetime import datetime
+        # 
+        # log_dir = "/app/logs"
+        # os.makedirs(log_dir, exist_ok=True)
+        # log_file = os.path.join(log_dir, "import_report.log")
+        # 
+        # logging.basicConfig(
+        #     filename=log_file,
+        #     level=logging.DEBUG,
+        #     format='%(asctime)s - %(levelname)s - %(message)s',
+        #     force=True
+        # )
+        # logger = logging.getLogger("import_report")
+        # 
+        # logger.info(f"=== NEW IMPORT REQUEST at {datetime.now().isoformat()} ===")
+        # logger.info(f"Report text length: {len(data.report_text)} chars")
+        # logger.info(f"Customer ID: {data.customer_id}")
+        # logger.debug(f"Report preview (first 500 chars): {data.report_text[:500]}...")
+        # === END DEBUG LOGGING ===
+        
+        try:
+            structure = await campaign_service.generate_campaign_from_report(
+                report_text=data.report_text,
+                customer_id=data.customer_id
+            )
+            return structure
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise e
 
     @get("/test-gemini")
     async def test_gemini(self, gemini_service: GeminiService) -> dict:
-        """
-        Simple connectivity test for Gemini API.
-        Sends "Respond with 'OK'" to the model.
-        """
         return await gemini_service.health_check()
 
 
