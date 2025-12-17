@@ -1,0 +1,417 @@
+﻿Architectural Specification and Implementation Strategy: IMAP Hub & CampaignWizard
+1. Executive Summary and Architectural Vision
+The digital marketing landscape is undergoing a fundamental transformation, shifting from manual, intuition-based asset creation to automated, data-driven orchestration. The IMAP Hub represents a decisive response to this shift, designed as an internal enterprise platform to centralize, standardize, and automate the complex workflows inherent in modern advertising. At the heart of this platform lies the CampaignWizard (internally referred to as the Campaign Architect), a module tasked with a highly specific and computationally demanding objective: the orchestration of high-fidelity marketing assets for hierarchical platforms, primarily Google Ads.
+The architectural vision for the IMAP Hub is grounded in a singular, guiding philosophy: "Deterministic Flexibility." This concept addresses the central paradox of modern marketing engineering. On one hand, marketing data structures—campaigns, ad groups, responsive search ads (RSAs), and granular assets—are inherently hierarchical and deeply interconnected, resembling a complex graph rather than a flat table. On the other hand, the generative artificial intelligence (AI) models required to produce creative content at scale are probabilistic, non-deterministic, and prone to hallucination. A system that is purely flexible (like a schemaless document store) becomes a chaotic swamp of unvalidated data; a system that is purely deterministic (like a rigid SQL schema) becomes brittle and incapable of modeling the fluid relationships of creative assets.
+Therefore, the IMAP Hub is engineered to impose absolute, mathematical strictness on data types, state transitions, and validation logic (Determinism) while utilizing a multi-model graph database to allow for arbitrary depth and interconnectedness of marketing entities (Flexibility). This philosophy dictates every technology choice in the stack, rejecting common defaults in favor of high-performance, specialized tools.1 We have selected Litestar over FastAPI for its superior serialization performance and architectural rigor; ArangoDB over PostgreSQL to natively model the ad hierarchy as a graph; and Svelte 5 over React to leverage fine-grained, compiler-based reactivity that eliminates the runtime overhead of the Virtual DOM.1
+This document serves as the comprehensive strategic and technical manual for the IMAP Hub. It defines the Standardized Research Report—the strategic input template that seeds the system—and provides an exhaustive Implementation Guide for the CampaignWizard, specifically addressing the critical integration of Generative AI with a graph-based persistence layer.
+________________
+2. The Standardized Research Report: Strategy as Code
+In the era of AI-driven marketing, the quality of output is strictly bound by the quality of input. The "Garbage In, Garbage Out" principle is exacerbated by Large Language Models (LLMs), which will confidently hallucinate plausible but ineffective copy if given vague instructions. Consequently, the Standardized Research Report is not merely a passive document or a PDF briefing; it is a rigorous Data Contract. It serves as the "System Prompt" context that governs the behavior of the Generative AI (Gemini 2.5 Flash) within the CampaignWizard.
+The definition of this report template is the first step in the implementation process. It structures the strategic intent of a campaign into discrete, machine-readable components that map directly to the domain entities in our graph database.
+2.1 Strategic Context and Campaign Objectives
+The foundation of any campaign is its objective. In the Google Ads ecosystem, this is not a free-text field but a strict enumeration that dictates bidding behavior and algorithmic optimization. The Research Report must capture these constraints explicitly to prevent impedance mismatches between the strategy and the execution platform.
+Strategic Input
+	Technical Mapping (Google Ads API)
+	Validation Logic
+	Campaign Objective
+	AdvertisingChannelType (e.g., SEARCH, PERFORMANCE_MAX)
+	Must map to valid enum values from CampaignService.
+	Primary Goal
+	ConversionGoals (e.g., LEADS, SALES)
+	Used to configure bidding_strategy_type.
+	Target Location
+	GeoTargetConstant (e.g., "Criterion/2840" for USA)
+	Validated against Google's Geo-Targeting database.
+	Budget Cap
+	CampaignBudget.amount_micros
+	Parsed as integer (currency units × 1,000,000).
+	Bid Strategy
+	TargetCpa, TargetRoas, MaximizeConversions
+	strictly typed msgspec.Struct ensuring valid threshold values.
+	Architectural Implication:
+When a strategist fills out this section of the report, they are essentially configuring the root node of the campaign graph (Campaign vertex). The "Invisible Validation Loop" (detailed in Section 3) uses these inputs to constrain the creative generation. For instance, if the Objective is "Brand Awareness," the AI is instructed to prioritize impression-share messaging over direct-response calls to action (CTAs). Conversely, a "Leads" objective triggers a prompt chain focused on high-intent verbs ("Buy," "Subscribe," "Join").2
+2.2 The Value Proposition Canvas: Pains, Gains, and Jobs to be Done
+To generate high-performance Responsive Search Ads (RSAs), the system requires more than just a product description; it needs a psychological map of the customer. The Standardized Research Report incorporates the Value Proposition Canvas to structure this qualitative data.4 This section is critical because RSAs function by rotating multiple headlines and descriptions to find the optimal combination for a specific user query. To feed this rotation effectively, we need diverse angles of persuasion.
+2.2.1 Customer Pains (The "Problem-Aware" Angle)
+This subsection captures the specific negative emotions, risks, or obstacles the target audience faces.
+* Input Requirement: List 3-5 distinct "Pains."
+* Example: "High latency in current SQL queries," "Manual overhead in reporting," "Data silos."
+* AI Transformation: The GeminiService transforms these inputs into "Problem-Aware" headlines. A pain point like "Manual reporting overhead" becomes the headline "Stop Wasting Time on Reports" or "Automate Your Ad Reporting".5
+2.2.2 Customer Gains (The "Solution-Aware" Angle)
+This subsection captures the positive outcomes and benefits the customer desires.
+* Input Requirement: List 3-5 distinct "Gains," quantified where possible.
+* Example: "50% faster query execution," "Single source of truth," "Real-time dashboards."
+* AI Transformation: These become "Benefit-Centric" headlines and descriptions. "50% faster query execution" is permuted into "Query at Lightning Speed" or "Reduce Latency by 50%".6
+2.2.3 The Unique Value Proposition (UVP)
+The report must distill the strategy into a single, compelling UVP statement.
+* Definition: What is the one thing you offer that competitors do not?
+* Technical Constraint: This statement is often a candidate for Pinning. In the CampaignWizard, the UVP is frequently pinned to HEADLINE_1 to ensure it is always visible, overriding Google's algorithmic rotation. The report must explicitly flag if the UVP requires this strict visibility.7
+2.3 Keyword Taxonomy and Clustering
+The structure of a Google Ads campaign is defined by its Ad Groups, which are in turn defined by keyword clusters. The Standardized Research Report rejects flat lists of keywords in favor of a hierarchical taxonomy that supports Single Theme Ad Groups (STAGs). This ensures high "Ad Relevance," a key quality score metric.9
+The report requires keywords to be categorized into four distinct buckets:
+1. Brand Protection: Keywords related strictly to the entity's own brand. These usually have high Quality Scores and low costs. The strategy here is defensive—preventing competitors from poaching traffic.
+2. High-Intent / Transactional: Keywords indicating an immediate readiness to purchase (e.g., "Enterprise Graph Database pricing," "Buy ad orchestration software"). These clusters drive the "Leads" objective.
+3. Discovery / Problem-Aware: Keywords related to the problem rather than the solution (e.g., "How to manage complex ad campaigns," "SQL join is slow"). These drive awareness.
+4. Negative Keyword Lists: A critical and often overlooked component. The report must specify terms to exclude.
+   * Universal Negatives: "Free," "Cheap," "Jobs," "Login."
+   * Competitor Negatives: Unless running a specific conquesting campaign, competitor names should be excluded to avoid low-relevance clicks.10
+Data Structure:
+In the backend, this taxonomy is not just text; it maps to a SharedSet entity in the graph. A SharedSet of negative keywords can be linked to multiple campaigns, enforcing a global safety policy.
+2.4 Competitive Landscape Analysis
+Finally, the report requires a structured analysis of 3-5 key competitors. This is used for "Counter-Positioning."
+* Competitor A: "Known for high price." -> Counter-Strategy: emphasize "Cost-Efficiency."
+* Competitor B: "Known for complexity." -> Counter-Strategy: Emphasize "Ease of Use."
+This structured input allows the LLM to generate "Us vs. Them" assets that directly address market gaps without explicitly naming competitors (which can violate trademark policies).
+________________
+3. Backend Architecture: The Modular Monolith (Litestar)
+The technical core of the IMAP Hub is built on Litestar, a modern ASGI framework for Python. This choice is deliberate and represents a departure from the more common FastAPI. The decision is driven by the specific requirements of the CampaignWizard: high-throughput JSON processing, strict schema validation, and a need for a robust dependency injection system to manage the complexity of the domain graph.1
+3.1 The Case for Litestar and msgspec
+The CampaignWizard operates on massive data structures. A single campaign sync operation might involve thousands of nodes (Campaign -> AdGroups -> Ads -> Assets) being serialized and deserialized. Benchmarks consistently show that msgspec, which Litestar uses natively, significantly outperforms Pydantic V2 (used by FastAPI).
+* Decoding Speed: msgspec can decode JSON to Python objects up to 3.3x faster than Pydantic V2.11
+* Encoding Speed: msgspec encoding is similarly optimized, often achieving 3.3x to 5x throughput improvements.11
+For a platform that aims to be the "Central Hub" for marketing operations, latency in the "Asset Workspace" (where users interact with these objects) equates to poor user experience. By utilizing Litestar with msgspec.Struct instead of pydantic.BaseModel for our internal DTOs (Data Transfer Objects), we reduce the overhead of the serialization layer to a negligible factor.
+3.1.1 Implementation Pattern: The DTO Factory
+We implement the DTO Pattern to strictly separate our internal domain models (business logic) from the external API representations. This is crucial for the Partial Update workflows required by the Wizard.
+Code Structure (src/app/domain/campaigns/models.py):
+
+
+Python
+
+
+
+
+import msgspec
+from litestar.dto import DataclassDTO, DTOConfig
+from uuid import UUID
+
+# Domain Entity (Internal)
+class Campaign(msgspec.Struct):
+   id: UUID
+   name: str
+   budget_micros: int
+   status: str
+   # Internal fields not exposed to frontend
+   google_resource_name: str | None = None
+   sync_hash: str | None = None
+
+# Write DTO (Input Validation)
+class CampaignWriteDTO(DataclassDTO[Campaign]):
+   # Exclude internal fields, enforce strict types
+   config = DTOConfig(exclude={"id", "google_resource_name", "sync_hash"})
+
+# Patch DTO (Partial Updates)
+class CampaignPatchDTO(DataclassDTO[Campaign]):
+   # Allow partial updates (e.g., just renaming)
+   config = DTOConfig(exclude={"id"}, partial=True)
+
+This pattern allows the frontend to send a JSON payload containing only a changed budget, and the backend efficiently merges this into the graph without requiring a full object replacement.12
+3.2 The Invisible Validation Loop: Taming the LLM
+The "Invisible Validation Loop" is the architectural component that enforces Determinism on the probabilistic LLM. It acts as an intelligent middleware between the raw generation service and the domain logic.
+The Workflow:
+1. Schema Definition: We define a target msgspec.Struct representing a valid RSA Asset. This includes constraints like max_length=30 for headlines.7
+2. Prompt Construction: The GeminiService constructs a prompt that includes the "Standardized Research Report" data and the JSON schema of the target struct.
+3. Generation: The LLM (Gemini 2.5 Flash) generates a candidate JSON response.
+4. Validation (The Gatekeeper): The system uses the Instructor library to attempt to hydrate the msgspec struct from the raw JSON.
+   * Note: Since Instructor relies on Pydantic, we use a "Schema Bridge" adapter pattern to convert msgspec structs to Pydantic models temporarily for this validation step.1
+5. The Correction Loop: If validation fails (e.g., a headline is 35 characters long), the middleware catches the ValidationError. It does not crash. Instead, it feeds the error message and the invalid JSON back into the LLM with a high-priority instruction: "You violated the length constraint on field 'headline'. Fix it."
+6. Success: This loop repeats (up to 3 times) until a valid object is produced, which is then passed to the controller.1
+Implementation Detail (src/app/lib/ai/service.py):
+
+
+Python
+
+
+
+
+import instructor
+from litestar.exceptions import InternalServerException
+
+async def generate_validated_asset(prompt: str, schema: type) -> T:
+   retries = 3
+   while retries > 0:
+       try:
+           # Call Gemini via LiteLLM/Instructor
+           response = await client.chat.completions.create(
+               model="gemini/gemini-2.5-flash",
+               messages=[{"role": "user", "content": prompt}],
+               response_model=schema
+           )
+           return response
+       except instructor.exceptions.ValidationError as e:
+           # Feedback loop: Append error to prompt context
+           prompt += f"\n\nError: {str(e)}\nFix the JSON."
+           retries -= 1
+   raise InternalServerException("AI failed to converge on valid schema.")
+
+3.3 Domain Logic Directory Structure
+The backend follows a strict Domain-Driven Design (DDD) directory structure to maintain modularity.
+* src/app/domain/:
+   * assets/: Contains logic for Asset creation, deduplication (hashing), and validation.
+   * campaigns/: Orchestrates the Campaign entity and its relationships (AdGroups). Contains the GoogleAdsMutator which handles the API sync.
+   * reporting/: Contains the GAQLService (Google Ads Query Language) builder for fetching performance metrics.1
+   * auth/: Manages OIDC authentication with Microsoft Entra ID. Uses Authlib and stores tokens with AES-256-GCM encryption.1
+* src/app/lib/:
+   * db/: The ArangoClient and repository base classes.
+   * ai/: The GeminiService and Instructor integration.
+   * google_ads/: The GoogleAdsClientFactory for managing API sessions.
+________________
+4. Data Layer Specification: ArangoDB Graph Modeling
+The choice of ArangoDB is critical. Relational databases (like PostgreSQL) struggle with the arbitrary depth and "many-to-many" relationships inherent in advertising data. An Asset (e.g., a specific headline) can belong to infinite Ads; an Ad belongs to an AdGroup; an AdGroup belongs to a Campaign. Modeling this in SQL requires complex join tables and recursive CTEs (Common Table Expressions) for retrieval. In a Graph Database, this is a native, constant-time traversal.15
+4.1 Graph Schema Definition
+We define the graph AdsGraph with specific Vertex and Edge collections.
+Vertex Collections (Nodes):
+1. Campaigns: Stores high-level settings (Budget, Geo-Targeting, Bidding Strategy).
+2. AdGroups: Stores status (ENABLED/PAUSED) and default CPC bids.
+3. Assets: The most important collection. It stores the actual creative content (Text, Image URL).
+   * Constraint: This collection is Deduplicated. A specific string of text (e.g., "Buy Now") exists as a vertex once and only once in the entire database, regardless of how many ads use it.
+Edge Collections (Relationships):
+1. belongs_to: Directional link from AdGroup -> Campaign.
+2. uses_asset: Directional link from AdGroup (or Ad) -> Asset.
+   * Edge Attributes: This is where context lives. Attributes like pinned_field (e.g., HEADLINE_1) are stored on the Edge, not the Vertex. This allows the same Asset vertex to be pinned in one AdGroup but unpinned in another.17
+4.2 The "Missing Persistence Layer": Implementation Strategy
+The project status 1 highlights a critical gap: the persistence layer for generated assets is missing. We must implement a strategy to save the AI-generated graph into ArangoDB efficiently, handling the deduplication logic.
+The Solution: AQL "Upsert-Merge" Pattern
+We cannot simply INSERT data, as this would create duplicate Asset vertices. We must use the AQL UPSERT command, which acts as an atomic "Insert if missing, Update if exists" operation.
+Step 1: Deterministic Hashing
+Before interaction with the DB, the backend calculates a deterministic hash (SHA-256) for every asset's content. This hash becomes the _key for the Asset vertex.
+* Headline: "Best Graph DB" -> Hash: abc123...
+* Doc ID: Assets/abc123...
+Step 2: Batch AQL Execution
+We do not insert assets one by one. We use a batch AQL query to process the entire generated campaign structure in a single network round-trip.
+AQL Query for Asset Persistence:
+
+
+Code-Snippet
+
+
+
+
+FOR asset IN @assets
+   UPSERT { _key: asset.hash }
+   INSERT {
+       _key: asset.hash,
+       text: asset.text,
+       type: asset.type,
+       created_at: DATE_NOW()
+   }
+   UPDATE {
+       last_seen: DATE_NOW()
+   }
+   IN Assets
+   RETURN NEW
+
+This query guarantees that if the AI generates a headline that already exists in the library, we simply return the existing vertex rather than creating a duplicate.19
+Step 3: Edge Creation
+Once we have the vertex IDs (from the UPSERT return), we create the edges.
+
+
+Code-Snippet
+
+
+
+
+FOR link IN @links
+   UPSERT { _from: link.adgroup_id, _to: link.asset_id, field_type: link.field_type }
+   INSERT {
+       _from: link.adgroup_id,
+       _to: link.asset_id,
+       field_type: link.field_type,
+       pinned_field: link.pinned_field
+   }
+   UPDATE {
+       pinned_field: link.pinned_field
+   }
+   IN uses_asset
+
+This ensures the structural integrity of the campaign graph.21
+4.3 Query Strategy: High-Performance Traversal
+For the "Campaign Architect" view, we need to reconstruct the entire hierarchy for the UI. Instead of multiple SQL queries, we perform a single Graph Traversal.
+AQL Traversal Query:
+
+
+Code-Snippet
+
+
+
+
+FOR campaign IN Campaigns
+   FILTER campaign._key == @campaign_id
+   LET adgroups = (
+       FOR adgroup IN 1..1 INBOUND campaign belongs_to
+           LET assets = (
+               FOR asset, edge IN 1..1 OUTBOUND adgroup uses_asset
+                   RETURN MERGE(asset, { pinned_field: edge.pinned_field })
+           )
+           RETURN MERGE(adgroup, { assets: assets })
+   )
+   RETURN MERGE(campaign, { adgroups: adgroups })
+
+This query traverses from Campaign down to AdGroups and further down to Assets, collecting edge attributes (pinned_field) and merging them into the result. This delivers a complete, nested JSON object to the frontend in milliseconds.22
+________________
+5. Frontend Implementation: Svelte 5 & State Management
+The frontend is built with Svelte 5, utilizing its new Runes system ($state, $derived, $effect). This represents a significant shift from the legacy Svelte 3/4 reactivity model. The CampaignWizard is a high-density, interactive interface ("Asset Workspace") where users drag, drop, pin, and edit hundreds of asset tiles. Performance is paramount.
+5.1 Deep Reactivity with Runes ($state)
+A specific challenge in Svelte 5 is handling Deep Reactivity in arrays of objects. The CampaignWizard manages a list of assets (e.g., headlines: RSAAsset).
+The Problem: In Svelte 5, if an array contains standard JavaScript class instances, mutating a property inside the class instance (e.g., headline.text = "New Text") does not automatically trigger a UI update unless the class properties themselves are wrapped in $state proxies. A simple $state() array only tracks the array length and reference, not the deep mutations of its elements.24
+The Solution: The Deep State Proxy Pattern
+We must define our data models as Svelte 5 "Runed Classes."
+
+
+JavaScript
+
+
+
+
+// frontend/src/lib/models/Asset.svelte.js
+class Asset {
+   text = $state("");
+   pinned = $state(null);
+   id = $state("");
+
+   constructor(data) {
+       this.text = data.text;
+       this.pinned = data.pinned;
+       this.id = data.id;
+   }
+}
+
+// frontend/src/views/wizard/store.svelte.js
+export class WizardState {
+   headlines = $state(); // Array of Asset objects
+
+   addHeadline(text) {
+       // Pushing a reactive class instance into the array
+       this.headlines.push(new Asset({ text, pinned: null }));
+   }
+}
+
+By using $state on the individual class fields, we ensure Fine-Grained Reactivity. When a user types into a headline input, only that specific text node in the DOM updates. The rest of the list does not re-render. This optimization is crucial for maintaining 60fps performance in a large grid of inputs.26
+5.2 XState Integration: Deterministic Workflow
+The Wizard is not just a form; it is a state machine. We use XState to govern the high-level control flow, preventing the user from entering invalid states (e.g., trying to "Sync" while "Validation" is failing).
+Machine Definition:
+* States: idle -> generating -> reviewing -> validating -> syncing -> success (or error).
+* Guards: The transition from reviewing to syncing is guarded by a validation check: isValidRSA (must have 3 headlines, 2 descriptions).
+Integration Pattern:
+The XState machine is treated as a global store. Svelte components subscribe to the machine's state (snapshot) to determine availability of UI elements.
+
+
+HTML
+
+
+
+
+<button
+ disabled={!$actor.snapshot.matches('reviewing') ||!$actor.snapshot.context.isValid}
+ onclick={() => actor.send({ type: 'SYNC' })}
+>
+ Sync to Google Ads
+</button>
+
+This decouples the UI logic from the business logic, ensuring the workflow is mathematically deterministic.1
+5.3 Component Architecture and Atomic Design
+The frontend follows a strict Atomic Design principle, adapted for Svelte.
+* Atoms: Icon.svelte (Base SVG wrapper), Badge.svelte.
+* Molecules: AssetTile.svelte (Container for an asset, pinning controls, and validation indicators).
+* Organisms: AssetWorkspace.svelte (The grid layout managing the list of tiles).
+The Icon Convention:
+To maintain visual consistency and reduce code duplication, raw SVGs are strictly forbidden in page views. All icons reside in frontend/src/lib/components/icons/. Each is a Svelte component (icon_edit.svelte) that exposes props for size, color, and strokeWidth. This allows global styling changes (e.g., changing the primary brand color) to propagate instantly across all icons.1
+________________
+6. Google Ads API Integration: The Sync Engine
+The final output of the CampaignWizard is a mutation request to the Google Ads API. This integration is complex due to the API's strict policy checks and hierarchical dependency requirements.
+6.1 RSA Structure and Constraints
+Responsive Search Ads (RSAs) are the default ad type. They function by rotating assets.
+* Constraints:
+   * Headlines: Min 3, Max 15. Max Length 30 chars.
+   * Descriptions: Min 2, Max 4. Max Length 90 chars.
+   * Pinning: Assets can be pinned to HEADLINE_1, HEADLINE_2, HEADLINE_3 (or DESCRIPTION equivalents). Pinning restricts machine learning but guarantees visibility.7
+Strategic Pinning:
+While Google advises against pinning to maximize ML performance, the IMAP Hub permits it for regulatory compliance and UVP enforcement. If the Research Report marks the UVP as "Critical," the GoogleAdsMutator service will set the pinned_field attribute to HEADLINE_1 on the AdTextAsset object sent to the API.8
+6.2 Asset-Based Management Strategy
+We utilize the modern Asset-based mutation model. We do not send strings directly to the ad creation endpoint.
+1. Create Assets First: The backend iterates through the graph. For every Asset vertex, it checks if a google_resource_name exists.
+   * If Yes: Reuse it.
+   * If No: Call AssetService.mutateAssets to upload the text/image. Google returns a resource name (e.g., customers/123/assets/456). We save this back to the ArangoDB vertex for future reuse.30
+2. Link to Ad: Once all assets are uploaded, we construct the AdGroupAd operation. We reference the assets by their ResourceName. This keeps the Google Ads account clean; the string "Free Shipping" exists once in the Asset Library and is referenced by 50 ads, rather than being duplicated 50 times.30
+6.3 Error Handling: The "Try-Catch-Exempt" Loop
+Google Ads API is notoriously strict about policies (capitalization, punctuation, trademarks). A simple "Create" call often fails. We implement a recursive "Try-Catch-Exempt" strategy.1
+1. Try: Attempt the mutation.
+2. Catch: Catch GoogleAdsException. Inspect the errors list.
+3. Analyze: Check if the error is a PolicyFindingError.
+4. Exempt: If the policy violation is "exemptible" (e.g., "Non-standard punctuation" for a brand name), construct a PolicyViolationKey object and add it to the exemption_requests field of the operation.
+5. Retry: Resubmit the mutation with the exemption key.
+6. Fail: If the error is non-exemptible (e.g., "Profanity"), abort and return the specific error to the frontend state machine.
+________________
+7. Implementation Guide: Step-by-Step Construction
+This guide addresses the specific unsatisfied requirements identified in the project status, providing a linear path to completion.
+Phase 1: The Missing Persistence Layer (Backend)
+Objective: Enable saving of AI-generated assets to ArangoDB with deduplication.
+1. Database Initialization:
+   * Script: src/app/lib/db/init_db.py.
+   * Action: Ensure AdsGraph is created. Create Assets (vertex) and uses_asset (edge) collections. Create a Persistent Index on Assets.hash to support the Upsert performance.20
+2. Hashing Service:
+   * File: src/app/domain/assets/services.py.
+   * Action: Implement generate_asset_hash(text: str, type: str) -> str. Use SHA-256. This ensures that the same text always resolves to the same database key.
+3. AQL Repository Implementation:
+   * File: src/app/lib/db/repository.py.
+   * Action: Implement batch_upsert_assets using the AQL query defined in Section 4.2. Utilize ArangoClient to execute this as a single transaction if possible, or a batch request.
+4. Connect AI Service:
+   * File: src/app/domain/campaigns/services.py.
+   * Action: In the generate_campaign method, receive the JSON from GeminiService. Immediately call batch_upsert_assets. This persists the "Draft" state before the user even sees it in the frontend.
+Phase 2: Reactive Frontend Engineering (Frontend)
+Objective: Fix the array reactivity issue and implement the workspace UI.
+1. Model Definition:
+   * File: frontend/src/lib/models.svelte.js.
+   * Action: Define class Asset {... } using $state runes for all properties.
+2. Store Migration:
+   * File: frontend/src/views/wizard/store.svelte.js.
+   * Action: Import the Asset class. Refactor the addHeadline and removeHeadline methods to manipulate the array of these class instances.
+3. Validation Components:
+   * File: frontend/src/lib/components/ValidationBadge.svelte.
+   * Action: Create a component that accepts text as a prop. Use a derived rune: let count = $derived(text.length);. Use $effect to emit a warning if count > limit.
+4. Stream Integration:
+   * File: frontend/src/views/wizard/Wizard.svelte.
+   * Action: Implement the SSE (Server-Sent Events) consumer. Connect it to the "Generate" button. Update the local store incrementally as the backend streams generation progress.1
+Phase 3: The Google Ads Sync (Integration)
+Objective: Push the graph to the API.
+1. Mutator Service:
+   * File: src/app/domain/campaigns/mutations.py.
+   * Action: Implement GoogleAdsMutator.
+   * Logic: Fetch full hierarchy from ArangoDB. Iterate AdGroups. For each, iterate Assets. Check google_resource_name. Mutate Assets. Collect ResourceNames. Mutate AdGroupAds.
+2. Exemption Logic:
+   * Action: Implement the _handle_policy_error method within the mutator to parse failure responses and re-queue operations with exemption keys if applicable.
+________________
+8. Conclusion
+The IMAP Hub is a sophisticated response to the complexity of modern marketing. By leveraging Litestar for high-performance, strictly-typed backend logic, ArangoDB for native graph modeling of hierarchical ad data, and Svelte 5 for a highly reactive, compiler-optimized frontend, the architecture solves the fundamental challenges of determinism and flexibility.
+The implementation of the Standardized Research Report ensures that the AI component is grounded in strategic reality, while the Invisible Validation Loop ensures that its creative output remains within the strict bounds of platform requirements. This "Implementation Guide" provides the exact blueprint to bridge the current gap in persistence and deliver a fully functional, enterprise-grade CampaignWizard. The result is a system that transforms the chaotic process of campaign creation into a streamlined, deterministic, and highly scalable engineering discipline.
+Referenzen
+1. architecture.txt
+2. Campaigns - Ads API - Google for Developers, Zugriff am Dezember 17, 2025, https://developers.google.com/google-ads/api/docs/campaigns/overview
+3. SearchStream & Search | Google Ads API - Google for Developers, Zugriff am Dezember 17, 2025, https://developers.google.com/google-ads/api/videos/catalog/working-with-rest-3
+4. What is the Value Proposition Canvas? - B2B International, Zugriff am Dezember 17, 2025, https://www.b2binternational.com/research/methods/faq/what-is-the-value-proposition-canvas/
+5. Responsive Search Ads (RSAs): 2025 Guide + 6 Best Practices - Growth Minded Marketing, Zugriff am Dezember 17, 2025, https://growthmindedmarketing.com/blog/responsive-search-ads/
+6. How to Write a Great Value Proposition [7 Top Examples + Template] - HubSpot Blog, Zugriff am Dezember 17, 2025, https://blog.hubspot.com/marketing/write-value-proposition
+7. About responsive search ads - Google Help, Zugriff am Dezember 17, 2025, https://support.google.com/google-ads/answer/7684791?hl=en
+8. Best Practices for Responsive Search Ads (RSA) in 2025 - Pattern Australia, Zugriff am Dezember 17, 2025, https://au.pattern.com/blog/best-practices-for-responsive-search-ads-rsa-in-2025/
+9. The Complete Guide to Google Ads for SaaS Companies: 2025 Best Practices & Case Studies - Aimers Agency, Zugriff am Dezember 17, 2025, https://aimers.io/blog/the-complete-guide-to-google-ads-for-saas-companies-best-practices
+10. Shared sets - Ads API - Google for Developers, Zugriff am Dezember 17, 2025, https://developers.google.com/google-ads/api/docs/targeting/shared-sets
+11. Benchmark: msgspec vs. Pydantic v2 | Backend APIs, Web Apps, Bots & Automation, Zugriff am Dezember 17, 2025, https://hrekov.com/blog/msgspec-vs-pydantic-v2-benchmark
+12. Updating instances - Litestar Framework, Zugriff am Dezember 17, 2025, https://docs.litestar.dev/2/tutorials/dto-tutorial/09-updating.html
+13. Litestar library documentation — Litestar Framework, Zugriff am Dezember 17, 2025, https://docs.litestar.dev/
+14. Instructor LLM Tutorial: Complete Guide to Structured Outputs, Zugriff am Dezember 17, 2025, https://python.useinstructor.com/learning/
+15. Dgraph vs ArangoDB: Architecture and Consistency - PuppyGraph, Zugriff am Dezember 17, 2025, https://www.puppygraph.com/blog/arangodb-vs-dgraph
+16. Graph Data Structures in ArangoDB and Usage with .NET | by Ramazan Gunes | Medium, Zugriff am Dezember 17, 2025, https://medium.com/@gunesramazan/graph-data-structures-in-arangodb-and-usage-with-net-e615bded31b7
+17. Edges | ArangoDB Documentation, Zugriff am Dezember 17, 2025, https://www.arangodb.com/docs/stable/graphs-edges.html
+18. ArangoDB: (1 Graph with several Edge Definition) Vs (1 Edge Definition per Graph) - Stack Overflow, Zugriff am Dezember 17, 2025, https://stackoverflow.com/questions/26642706/arangodb-1-graph-with-several-edge-definition-vs-1-edge-definition-per-graph
+19. AQL Upsert performance ArangoDB with python-arango - Stack Overflow, Zugriff am Dezember 17, 2025, https://stackoverflow.com/questions/67875501/aql-upsert-performance-arangodb-with-python-arango
+20. deduplicating ArangoDB document collection - aql - Stack Overflow, Zugriff am Dezember 17, 2025, https://stackoverflow.com/questions/37704101/deduplicating-arangodb-document-collection
+21. Upsert does not work with edges and search-expression { _from: ..., _to: ...} #1442 - GitHub, Zugriff am Dezember 17, 2025, https://github.com/arangodb/arangodb/issues/1442
+22. Traversal · ArangoDB v3.2.0 AQL Documentation - Huihoo, Zugriff am Dezember 17, 2025, https://docs.huihoo.com/arangodb/3.2/AQL/Graphs/Traversals.html
+23. ArangoDb AQL Graph queries traversal example - Stack Overflow, Zugriff am Dezember 17, 2025, https://stackoverflow.com/questions/47177393/arangodb-aql-graph-queries-traversal-example
+24. Svelte 5 $state rune Class vs Object reactivity | Chasing Code, Zugriff am Dezember 17, 2025, https://chasingcode.dev/blog/svelte-5-state-rune-class-vs-object-reactivity/
+25. Why is my rune that holds an array, not being reactive? - Stack Overflow, Zugriff am Dezember 17, 2025, https://stackoverflow.com/questions/79210147/why-is-my-rune-that-holds-an-array-not-being-reactive
+26. The Svelte 5 Kernel: A Deep Dive into Runes and Fine-Grained Reactivity for Production, Zugriff am Dezember 17, 2025, https://devbytejournal.medium.com/the-svelte-5-kernel-a-deep-dive-into-runes-and-fine-grained-reactivity-for-production-10a52eb9a38d
+27. Svelte 5 and the Granular Reactivity Revolution with Runes - Leapcell, Zugriff am Dezember 17, 2025, https://leapcell.io/blog/svelte-5-and-the-granular-reactivity-revolution-with-runes
+28. A Complete Guide to Google RSAs in 2025 - Appear Online, Zugriff am Dezember 17, 2025, https://www.appearonline.co.uk/blog/a-complete-guide-to-google-rsas
+29. Responsive Search Ads | Google Ads API, Zugriff am Dezember 17, 2025, https://developers.google.com/google-ads/api/docs/responsive-search-ads/overview
+30. Asset creation and usage - Ads API - Google for Developers, Zugriff am Dezember 17, 2025, https://developers.google.com/google-ads/api/docs/assets/working-with-assets
+31. 7 Techniques to Enhance Graph Data Ingestion with Python in ArangoDB | Towards AI, Zugriff am Dezember 17, 2025, https://towardsai.net/p/l/7-techniques-to-enhance-graph-data-ingestion-with-python-in-arangodb

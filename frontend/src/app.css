@@ -4,13 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-imap-bg text-white;
-  /* Using white text on dark bg by default for readability, though user said imap-text is black. We will see. User generic requirement "body background on imap-bg" */
-  font-family: 'Poppins', sans-serif;
-}
+@layer base {
+  body {
+    @apply bg-imap-dark text-white;
+    font-family: 'Poppins', sans-serif;
+  }
 
-/* Global defaults override */
-button {
-  @apply rounded-none;
+  button {
+    @apply rounded-none;
+  }
 }

@@ -153,9 +153,9 @@
 </script>
 
 <div
-    class="h-screen flex flex-col bg-imap-bg overflow-hidden text-imap-text font-sans"
+    class="h-screen flex flex-col bg-imap-dark overflow-hidden text-imap-text font-sans"
 >
-    <Header />
+    <Header path={["Hub", "CampaignWizard"]} />
 
     <!-- Main Content Area (Dashboard Grid) -->
     <main

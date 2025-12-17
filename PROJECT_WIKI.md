@@ -77,21 +77,30 @@ src/
 
 ### 3.2 Frontend (`frontend/`)
 Standard Vite + Svelte setup.
-```text
 frontend/
 ├── src/
 │   ├── lib/
 │   │   ├── components/
+│   │   │   └── icons/         # Standardized Icons (SVG wrapper components)
 │   │   └── assets/
-│   ├── views/                   # Feature Modules (Hub, Wizard, Team)
-│   │   ├── hub/                 # The Hub Dashboard
-│   │   ├── wizard/              # Campaign Architect
-│   │   └── team/                # Team Management
-│   ├── App.svelte               # Main Entry & Router
+│   ├── views/                 # Feature Modules (Hub, Wizard, Team)
+│   │   ├── hub/               # The Hub Dashboard
+│   │   ├── wizard/            # Campaign Architect
+│   │   └── team/              # Team Management
+│   ├── App.svelte             # Main Entry & Router
 │   └── main.ts
 ├── package.json
 └── vite.config.ts
 ```
+
+### 3.2.1 Icon Convention
+**Global Rule:**
+- **Source:** SVGs are NOT used directly implementation-side.
+- **Location:** `frontend/src/lib/components/icons/`.
+- **Naming:** `icon_[name].svg`.
+- **Component:** For every SVG, a Svelte wrapper must be created in the same directory: `icon_[name].svelte`.
+- **Usage:** Import the Svelte component, not the SVG file.
+- **Styling:** The wrapper handles size and stroke logic (e.g., via `group-hover`).
 
 ### 3.3 Infrastructure
 - **Docker Compose:** defined in `docker-compose.yml`.
