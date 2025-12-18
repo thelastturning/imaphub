@@ -14,12 +14,16 @@ export class Asset {
     // Hash is derived, but for now we store it if passed
     hash = $state("");
 
+    // Selection State
+    state = $state("neutral"); // 'neutral', 'selected', 'rejected'
+
     constructor(data = {}) {
         this.text = data.text || "";
         this.type = data.type || "TEXT";
         this.pinned = data.pinned || null;
         this.id = data.id || crypto.randomUUID();
         this.hash = data.hash || "";
+        this.state = data.state || "neutral";
     }
 }
 

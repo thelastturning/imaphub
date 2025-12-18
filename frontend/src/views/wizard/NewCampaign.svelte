@@ -3,11 +3,13 @@
     import Header from "$lib/components/Header.svelte";
     import AssetTile from "$lib/components/AssetTile.svelte";
     import { wizardStore } from "./store.svelte.js";
+    import { Asset, AdGroup } from "$lib/models.svelte.js";
 
     // --- State ---
     let reportText = $state("");
     let isImportModalOpen = $state(false);
     let isUploading = $state(false);
+    /** @type {string | null} */
     let uploadError = $state(null);
 
     // Navigation State
@@ -15,15 +17,18 @@
     let activeSectionId = $state("general");
 
     // Derived Data for Views
+    /** @type {AdGroup | null | undefined} */
     let activeAdGroup = $derived(
         activeSectionId === "general"
             ? null
             : wizardStore.adGroups.find((ag) => ag.id === activeSectionId),
     );
 
+    /** @type {Asset[]} */
     let activeHeadlines = $derived(
         activeAdGroup ? activeAdGroup.headlines : [],
     );
+    /** @type {Asset[]} */
     let activeDescriptions = $derived(
         activeAdGroup ? activeAdGroup.descriptions : [],
     );
@@ -72,12 +77,16 @@
             // Staying on General allows them to check budget/name updates.
             isImportModalOpen = false;
         } catch (e) {
-            uploadError = e.message;
+            uploadError =
+                e instanceof Error
+                    ? e.message
+                    : "Ein unbekannter Fehler ist aufgetreten.";
         } finally {
             isUploading = false;
         }
     }
 
+    /** @param {string} id */
     function setActiveSection(id) {
         activeSectionId = id;
     }
@@ -175,7 +184,7 @@
                         Konfigurieren Sie globale Parameter manuell oder nutzen
                         Sie den Research-Import.
                     </p>
-                {:else}
+                {:else if activeAdGroup}
                     <div class="flex justify-between items-start">
                         <div>
                             <h1 class="text-2xl text-white font-bold">
@@ -364,52 +373,60 @@
                     </div>
                 {:else if activeAdGroup}
                     <!-- AD GROUP ASSETS -->
-                    <div
-                        class="grid grid-cols-2 gap-8"
-                        in:fly={{ y: 10, duration: 300, key: activeAdGroup.id }}
-                    >
-                        <!-- Headlines -->
-                        <div>
-                            <div class="flex items-center gap-2 mb-4">
-                                <span class="w-1 h-4 bg-imap-primary"></span>
-                                <h3 class="text-white font-bold">
-                                    Anzeigentitel
-                                </h3>
+                    {#key activeAdGroup.id}
+                        <div
+                            class="grid grid-cols-2 gap-8"
+                            in:fly={{ y: 10, duration: 300 }}
+                        >
+                            <!-- Headlines -->
+                            <div>
+                                <div class="flex items-center gap-2 mb-4">
+                                    <span class="w-1 h-4 bg-imap-primary"
+                                    ></span>
+                                    <h3 class="text-white font-bold">
+                                        Anzeigentitel
+                                    </h3>
+                                </div>
+                                <div class="space-y-3">
+                                    {#each activeHeadlines as h (h.id)}
+                                        <AssetTile
+                                            text={h.text}
+                                            state={h.state}
+                                            type="headline"
+                                            onStateChange={(
+                                                /** @type {'neutral' | 'selected' | 'rejected'} */ s,
+                                            ) => (h.state = s)}
+                                            onEdit={() => {}}
+                                        />
+                                    {/each}
+                                </div>
                             </div>
-                            <div class="space-y-3">
-                                {#each activeHeadlines as h (h.id)}
-                                    <AssetTile
-                                        text={h.text}
-                                        state={h.state}
-                                        type="headline"
-                                        onStateChange={(s) => (h.state = s)}
-                                        onEdit={() => {}}
-                                    />
-                                {/each}
-                            </div>
-                        </div>
 
-                        <!-- Descriptions -->
-                        <div>
-                            <div class="flex items-center gap-2 mb-4">
-                                <span class="w-1 h-4 bg-imap-primary"></span>
-                                <h3 class="text-white font-bold">
-                                    Beschreibungen
-                                </h3>
-                            </div>
-                            <div class="space-y-3">
-                                {#each activeDescriptions as d (d.id)}
-                                    <AssetTile
-                                        text={d.text}
-                                        state={d.state}
-                                        type="description"
-                                        onStateChange={(s) => (d.state = s)}
-                                        onEdit={() => {}}
-                                    />
-                                {/each}
+                            <!-- Descriptions -->
+                            <div>
+                                <div class="flex items-center gap-2 mb-4">
+                                    <span class="w-1 h-4 bg-imap-primary"
+                                    ></span>
+                                    <h3 class="text-white font-bold">
+                                        Beschreibungen
+                                    </h3>
+                                </div>
+                                <div class="space-y-3">
+                                    {#each activeDescriptions as d (d.id)}
+                                        <AssetTile
+                                            text={d.text}
+                                            state={d.state}
+                                            type="description"
+                                            onStateChange={(
+                                                /** @type {'neutral' | 'selected' | 'rejected'} */ s,
+                                            ) => (d.state = s)}
+                                            onEdit={() => {}}
+                                        />
+                                    {/each}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    {/key}
                 {/if}
             </div>
         </section>
